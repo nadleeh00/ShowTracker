@@ -1,28 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
 import {
+  Alert,
+  Modal,
+  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
-  View,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  Modal,
-  Alert,
-  SafeAreaView,
+  View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DataManager } from '../../utils/dataManager';
+import type { Show, Categories, FormData } from '../../types';
 
 export default function ShowTracker() {
-  const [shows, setShows] = useState([]);
-  const [categories, setCategories] = useState({
+  const insets = useSafeAreaInsets();
+  const [shows, setShows] = useState<Show[]>([]);
+  const [categories, setCategories] = useState<Categories>({
     genres: ['Drama', 'Comedy', 'Sci-Fi', 'Action', 'Documentary'],
     statuses: ['Currently Watching', 'Completed', 'On Hold', 'Plan to Watch']
   });
-  const [showModal, setShowModal] = useState(false);
-  const [categoryModal, setCategoryModal] = useState(false);
-  const [editingShow, setEditingShow] = useState(null);
-  const [formData, setFormData] = useState({
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [categoryModal, setCategoryModal] = useState<boolean>(false);
+  const [editingShow, setEditingShow] = useState<Show | null>(null);
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     genres: [],
     status: '',
@@ -149,13 +153,16 @@ export default function ShowTracker() {
     });
   };
 
-  const exportData = async () => {
-    try {
-      const dataStr = JSON.stringify({ shows, categories }, null, 2);
-      console.log('Export data:', dataStr);
-      Alert.alert('Export', 'Data logged to console. In a full app, this would save to file.');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to export data');
+  const exportData = async (): Promise<void> => {
+    await DataManager.exportData(shows, categories);
+  };
+  
+  const importData = async (): Promise<void> => {
+    const importedData = await DataManager.importData();
+    if (importedData) {
+      setShows(importedData.shows);
+      setCategories(importedData.categories);
+      Alert.alert('Success', 'Data imported successfully!');
     }
   };
 
@@ -308,7 +315,7 @@ export default function ShowTracker() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Show Tracker</Text>
         <View style={styles.headerButtons}>
@@ -332,6 +339,10 @@ export default function ShowTracker() {
         <TouchableOpacity onPress={exportData} style={styles.exportButton}>
           <Ionicons name="download" size={16} color="#fff" />
           <Text style={styles.exportButtonText}>Export</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={importData} style={[styles.exportButton, styles.importButton]}>
+          <Ionicons name="cloud-upload" size={16} color="#fff" />
+          <Text style={styles.exportButtonText}>Import</Text>
         </TouchableOpacity>
       </View>
 
@@ -504,7 +515,7 @@ export default function ShowTracker() {
       </Modal>
 
       <CategoryManager />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -556,6 +567,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 8,
+    gap: 8,
   },
   exportButton: {
     flexDirection: 'row',
@@ -566,9 +578,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#6b7280',
     borderRadius: 6,
   },
-  exportButtonText: {
-    color: '#fff',
-    fontSize: 12,
+  importButton: {
+    backgroundColor: '#3b82f6',
   },
   content: {
     flex: 1,
