@@ -13,6 +13,7 @@ export interface Show {
   export interface Categories {
     genres: string[];
     statuses: string[];
+    [key: string]: string[];
   }
   
   export interface AppData {

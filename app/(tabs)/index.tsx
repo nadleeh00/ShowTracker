@@ -36,6 +36,8 @@ export default function ShowTracker() {
     dateWatched: new Date().toISOString().split('T')[0],
     notes: ''
   });
+  const [filenameModal, setFilenameModal] = useState<boolean>(false);
+  const [exportFilename, setExportFilename] = useState<string>('');
 
   // Load data from AsyncStorage on mount
   useEffect(() => {
@@ -47,6 +49,7 @@ export default function ShowTracker() {
     if (shows.length > 0 || categories.genres.length > 5) {
       saveData();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shows, categories]);
 
   const loadData = async () => {
@@ -72,7 +75,7 @@ export default function ShowTracker() {
   };
 
   const handleSubmit = () => {
-    if (!formData.name || formData.genres.length === 0 || !formData.status || !formData.rating || !formData.season || !formData.episode) {
+    if ((!formData.name || formData.genres.length === 0) && !formData.status && !formData.rating && !formData.season && !formData.episode) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
@@ -109,14 +112,14 @@ export default function ShowTracker() {
     setShowModal(false);
   };
 
-  const editShow = (show) => {
+  const editShow = (show: Show) => {
     setFormData({
       name: show.name,
       genres: show.genres || [],
       status: show.status,
-      rating: show.rating.toString(),
-      season: show.season.toString(),
-      episode: show.episode.toString(),
+      rating: show.rating == null? '' : show.rating.toString(),
+      season: show.season == null? '' : show.season.toString(),
+      episode: show.episode == null? '' : show.episode.toString(),
       dateWatched: show.dateWatched,
       notes: show.notes || ''
     });
@@ -124,7 +127,7 @@ export default function ShowTracker() {
     setShowModal(true);
   };
 
-  const deleteShow = (id) => {
+  const deleteShow = (id: number) => {
     Alert.alert(
       'Delete Show',
       'Are you sure you want to delete this show?',
@@ -137,7 +140,7 @@ export default function ShowTracker() {
     );
   };
 
-  const addCategory = (type, value) => {
+  const addCategory = (type: keyof Categories, value: string) => {
     if (value && !categories[type].includes(value)) {
       setCategories({
         ...categories,
@@ -146,15 +149,26 @@ export default function ShowTracker() {
     }
   };
 
-  const removeCategory = (type, value) => {
+  const removeCategory = (type: string, value: string) => {
     setCategories({
       ...categories,
-      [type]: categories[type].filter(cat => cat !== value)
+      [type]: categories[type].filter((cat: string) => cat !== value)
     });
   };
 
   const exportData = async (): Promise<void> => {
-    await DataManager.exportData(shows, categories);
+    const defaultName = `showtracker-backup-${new Date().toISOString().split('T')[0]}`;
+    setExportFilename(defaultName);
+    setFilenameModal(true);
+  };
+  
+  const handleExportWithFilename = async (): Promise<void> => {
+    const sanitizedFilename = exportFilename.trim().replace(/[<>:"/\\|?*]/g, '-') || 
+      `showtracker-backup-${new Date().toISOString().split('T')[0]}`;
+    
+    setFilenameModal(false);
+    await DataManager.exportData(shows, categories, sanitizedFilename);
+    setExportFilename('');
   };
   
   const importData = async (): Promise<void> => {
@@ -166,7 +180,7 @@ export default function ShowTracker() {
     }
   };
 
-  const toggleGenre = (genre) => {
+  const toggleGenre = (genre: string) => {
     if (formData.genres.includes(genre)) {
       setFormData({
         ...formData,
@@ -515,6 +529,46 @@ export default function ShowTracker() {
       </Modal>
 
       <CategoryManager />
+
+      <Modal visible={filenameModal} transparent animationType="slide">
+        <View style={styles.pickerModal}>
+          <View style={styles.filenameModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Export Filename</Text>
+              <TouchableOpacity onPress={() => setFilenameModal(false)}>
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.filenameContent}>
+              <Text style={styles.label}>Enter filename (without .json extension):</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter filename"
+                value={exportFilename}
+                onChangeText={setExportFilename}
+                autoFocus
+              />
+              
+              <View style={styles.filenameButtons}>
+                <TouchableOpacity 
+                  onPress={() => setFilenameModal(false)}
+                  style={[styles.filenameButton, styles.cancelButton]}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  onPress={handleExportWithFilename}
+                  style={[styles.filenameButton, styles.exportConfirmButton]}
+                >
+                  <Text style={styles.exportConfirmButtonText}>Export</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -525,7 +579,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
   },
   header: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -577,6 +631,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     backgroundColor: '#6b7280',
     borderRadius: 6,
+  },
+  exportButtonText: {
+    color: '#000000',
+    fontWeight: '300',
   },
   importButton: {
     backgroundColor: '#3b82f6',
@@ -829,5 +887,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 14,
+  },
+  filenameModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '40%',
+    minHeight: 200,
+  },
+  filenameContent: {
+    padding: 16,
+  },
+  filenameButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  filenameButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#6b7280',
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontWeight: '500',
+  },
+  exportConfirmButton: {
+    backgroundColor: '#10b981',
+  },
+  exportConfirmButtonText: {
+    color: '#fff',
+    fontWeight: '500',
   },
 });

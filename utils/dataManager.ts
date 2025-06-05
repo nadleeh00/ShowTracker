@@ -7,7 +7,7 @@ import type { AppData, Show, Categories } from '../types';
 export class DataManager {
   private static readonly VERSION = "1.0";
 
-  static async exportData(shows: Show[], categories: Categories): Promise<void> {
+  static async exportData(shows: Show[], categories: Categories, customFilename?: string): Promise<void> {
     try {
       const dataToExport: AppData = {
         shows,
@@ -15,11 +15,14 @@ export class DataManager {
         exportDate: new Date().toISOString(),
         version: this.VERSION
       };
-
+  
       const jsonString = JSON.stringify(dataToExport, null, 2);
-      const filename = `showtracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+      
+      // Use custom filename or generate default
+      const defaultName = `showtracker-backup-${new Date().toISOString().split('T')[0]}`;
+      const filename = customFilename ? `${customFilename}.json` : `${defaultName}.json`;
       const fileUri = FileSystem.documentDirectory + filename;
-
+  
       await FileSystem.writeAsStringAsync(fileUri, jsonString);
       
       if (await Sharing.isAvailableAsync()) {
@@ -31,7 +34,7 @@ export class DataManager {
       } else {
         Alert.alert('Export Complete', `Data saved to: ${filename}`);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Export error:', error);
       Alert.alert('Export Error', 'Failed to export data. Please try again.');
     }
@@ -40,27 +43,65 @@ export class DataManager {
   static async importData(): Promise<AppData | null> {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/json',
-        copyToCacheDirectory: false,
+        type: ['application/json', 'text/plain', '*/*'], // More permissive types
+        copyToCacheDirectory: true,
       });
-
+  
       if (result.canceled) {
         return null;
       }
-
-      const fileContent = await FileSystem.readAsStringAsync(result.assets[0].uri);
+  
+      let fileContent: string;
+      const asset = result.assets[0];
+      
+      try {
+        // Try direct read first
+        fileContent = await FileSystem.readAsStringAsync(asset.uri);
+      } catch (directReadError: unknown) {
+        console.log('Direct read failed, trying copy method...');
+        
+        // If direct read fails, use copy method
+        const fileName = asset.name || 'import.json';
+        const tempUri = `${FileSystem.cacheDirectory}${fileName}`;
+        
+        await FileSystem.copyAsync({
+          from: asset.uri,
+          to: tempUri
+        });
+        
+        fileContent = await FileSystem.readAsStringAsync(tempUri);
+        
+        // Clean up
+        await FileSystem.deleteAsync(tempUri, { idempotent: true });
+      }
+  
+      // Parse and validate
       const importedData = JSON.parse(fileContent) as AppData;
-
-      // Validate data structure
+  
       if (!this.validateImportData(importedData)) {
         Alert.alert('Import Error', 'Invalid file format. Please select a valid ShowTracker backup file.');
         return null;
       }
-
+  
       return importedData;
     } catch (error) {
       console.error('Import error:', error);
-      Alert.alert('Import Error', 'Failed to import data. Please check the file format and try again.');
+      
+      // Type guard for error handling
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // error messages
+      if (errorMessage.includes('Unsupported scheme')) {
+        Alert.alert(
+          'Import Error', 
+          'Unable to read the selected file. Try saving the file to your device storage and selecting it again.'
+        );
+      } else if (errorMessage.includes('JSON')) {
+        Alert.alert('Import Error', 'The selected file is not a valid JSON format.');
+      } else {
+        Alert.alert('Import Error', 'Failed to import data. Please try again or select a different file.');
+      }
+      
       return null;
     }
   }
