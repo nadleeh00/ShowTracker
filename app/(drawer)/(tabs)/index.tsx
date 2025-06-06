@@ -10,9 +10,159 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Animated,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Show, Categories, FormData } from '../../../types';
+
+// Enable LayoutAnimation for Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+interface ExpandableShowCardProps {
+  show: Show;
+  onEdit: (show: Show) => void;
+  onDelete: (id: number) => void;
+}
+
+const ExpandableShowCard: React.FC<ExpandableShowCardProps> = ({ show, onEdit, onDelete }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const toggleExpanded = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded(!expanded);
+  };
+
+  const getRatingColor = (rating: number): string => {
+    if (rating >= 8) return '#10b981'; // Green for great shows
+    if (rating >= 6) return '#f59e0b'; // Yellow for good shows
+    return '#ef4444'; // Red for poor shows
+  };
+
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case 'Currently Watching': return '#3b82f6';
+      case 'Completed': return '#10b981';
+      case 'On Hold': return '#f59e0b';
+      case 'Plan to Watch': return '#6b7280';
+      default: return '#6b7280';
+    }
+  };
+
+  return (
+    <View style={styles.showCard}>
+      <TouchableOpacity 
+        onPress={toggleExpanded}
+        style={styles.cardHeader}
+        activeOpacity={0.7}
+      >
+        <View style={styles.headerContent}>
+          <View style={styles.titleRow}>
+            <Text style={styles.showTitle} numberOfLines={expanded ? 0 : 2}>
+              {show.name}
+            </Text>
+            <View style={styles.headerIndicators}>
+              <View style={[styles.ratingBadge, { backgroundColor: getRatingColor(show.rating) }]}>
+                <Text style={styles.ratingText}>{show.rating}</Text>
+              </View>
+              <Ionicons 
+                name={expanded ? "chevron-up" : "chevron-down"} 
+                size={20} 
+                color="#6b7280" 
+              />
+            </View>
+          </View>
+          
+          {!expanded && (
+            <View style={styles.compactInfo}>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(show.status) }]}>
+                <Text style={styles.statusText}>{show.status}</Text>
+              </View>
+              <Text style={styles.episodeInfo}>S{show.season}E{show.episode}</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+
+      {expanded && (
+        <View style={styles.expandedContent}>
+          <View style={styles.detailsGrid}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Genres</Text>
+              <View style={styles.genreContainer}>
+                {show.genres && show.genres.length > 0 ? (
+                  show.genres.map((genre, index) => (
+                    <View key={index} style={styles.genreTag}>
+                      <Text style={styles.genreText}>{genre}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.detailValue}>None</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Status</Text>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(show.status) }]}>
+                <Text style={styles.statusText}>{show.status}</Text>
+              </View>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Rating</Text>
+              <View style={styles.ratingContainer}>
+                <View style={[styles.ratingBadge, { backgroundColor: getRatingColor(show.rating) }]}>
+                  <Text style={styles.ratingText}>{show.rating}</Text>
+                </View>
+                <Text style={styles.ratingScale}>/ 10</Text>
+              </View>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Progress</Text>
+              <Text style={styles.detailValue}>Season {show.season}, Episode {show.episode}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Last Watched</Text>
+              <Text style={styles.detailValue}>{show.dateWatched}</Text>
+            </View>
+
+            {show.notes && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Notes</Text>
+                <Text style={styles.notesText}>{show.notes}</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.actionBar}>
+            <TouchableOpacity 
+              onPress={() => onEdit(show)} 
+              style={[styles.actionButton, styles.editButton]}
+            >
+              <Ionicons name="create" size={16} color="#3b82f6" />
+              <Text style={styles.editButtonText}>Edit</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              onPress={() => onDelete(show.id)} 
+              style={[styles.actionButton, styles.deleteButton]}
+            >
+              <Ionicons name="trash" size={16} color="#ef4444" />
+              <Text style={styles.deleteButtonText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+};
 
 export default function ShowTracker() {
   const insets = useSafeAreaInsets();
@@ -208,7 +358,7 @@ export default function ShowTracker() {
         <Ionicons name="add" size={24} color="#fff" />
       </TouchableOpacity>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {shows.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="tv-outline" size={64} color="#9ca3af" />
@@ -216,53 +366,25 @@ export default function ShowTracker() {
             <Text style={styles.emptySubtext}>Tap the + button to add your first show!</Text>
           </View>
         ) : (
-          shows.map(show => (
-            <View key={show.id} style={styles.showCard}>
-              <View style={styles.showHeader}>
-                <Text style={styles.showTitle}>{show.name}</Text>
-                <View style={styles.showActions}>
-                  <TouchableOpacity onPress={() => editShow(show)} style={styles.actionButton}>
-                    <Ionicons name="create" size={18} color="#3b82f6" />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => deleteShow(show.id)} style={styles.actionButton}>
-                    <Ionicons name="trash" size={18} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <View style={styles.showDetails}>
-                <Text style={styles.detail}>
-                  <Text style={styles.detailLabel}>Genres: </Text>
-                  {show.genres ? show.genres.join(', ') : 'None'}
-                </Text>
-                <Text style={styles.detail}>
-                  <Text style={styles.detailLabel}>Status: </Text>
-                  {show.status}
-                </Text>
-                <Text style={styles.detail}>
-                  <Text style={styles.detailLabel}>Rating: </Text>
-                  {show.rating}/10
-                </Text>
-                <Text style={styles.detail}>
-                  <Text style={styles.detailLabel}>Last Watched: </Text>
-                  S{show.season}E{show.episode}
-                </Text>
-                <Text style={styles.detail}>
-                  <Text style={styles.detailLabel}>Date: </Text>
-                  {show.dateWatched}
-                </Text>
-                {show.notes && (
-                  <Text style={styles.detail}>
-                    <Text style={styles.detailLabel}>Notes: </Text>
-                    {show.notes}
-                  </Text>
-                )}
-              </View>
+          <>
+            <View style={styles.listHeader}>
+              <Text style={styles.listTitle}>Your Shows</Text>
+              <Text style={styles.listSubtitle}>{shows.length} show{shows.length !== 1 ? 's' : ''} tracked</Text>
             </View>
-          ))
+            
+            {shows.map(show => (
+              <ExpandableShowCard
+                key={show.id}
+                show={show}
+                onEdit={editShow}
+                onDelete={deleteShow}
+              />
+            ))}
+          </>
         )}
       </ScrollView>
 
-      {/* Show Modal */}
+      {/* Show Modal - keeping existing modal code unchanged */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -385,12 +507,25 @@ export default function ShowTracker() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#f8fafc',
   },
   content: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 16,
+  },
+  listHeader: {
+    paddingVertical: 20,
+    paddingBottom: 16,
+  },
+  listTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  listSubtitle: {
+    fontSize: 16,
+    color: '#6b7280',
   },
   fab: {
     position: 'absolute',
@@ -427,47 +562,175 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     textAlign: 'center',
   },
+  
+  // New expandable card styles
   showCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 3,
+    overflow: 'hidden',
   },
-  showHeader: {
+  cardHeader: {
+    padding: 16,
+  },
+  headerContent: {
+    gap: 12,
+  },
+  titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
   },
   showTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
     flex: 1,
+    marginRight: 12,
+    lineHeight: 24,
   },
-  showActions: {
+  headerIndicators: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
-  actionButton: {
-    padding: 8,
+  ratingBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 32,
+    alignItems: 'center',
   },
-  showDetails: {
-    gap: 4,
-  },
-  detail: {
+  ratingText: {
+    color: '#fff',
     fontSize: 14,
-    color: '#4b5563',
+    fontWeight: '600',
+  },
+  compactInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  episodeInfo: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  
+  // Expanded content styles
+  expandedContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  detailsGrid: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    minHeight: 24,
   },
   detailLabel: {
+    fontSize: 14,
     fontWeight: '500',
-    color: '#1f2937',
+    color: '#6b7280',
+    flex: 1,
+    marginRight: 12,
   },
+  detailValue: {
+    fontSize: 14,
+    color: '#1f2937',
+    flex: 2,
+    textAlign: 'right',
+  },
+  genreContainer: {
+    flex: 2,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 4,
+  },
+  genreTag: {
+    backgroundColor: '#e5e7eb',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  genreText: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  ratingScale: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  notesText: {
+    fontSize: 14,
+    color: '#1f2937',
+    flex: 2,
+    textAlign: 'right',
+    fontStyle: 'italic',
+  },
+  actionBar: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingTop: 8,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  editButton: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#3b82f6',
+  },
+  editButtonText: {
+    color: '#3b82f6',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  deleteButton: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#ef4444',
+  },
+  deleteButtonText: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  // Existing modal styles (unchanged)
   modalContainer: {
     flex: 1,
     backgroundColor: '#fff',
