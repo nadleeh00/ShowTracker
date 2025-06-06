@@ -10,12 +10,12 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Animated,
   LayoutAnimation,
   Platform,
   UIManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../../contexts/ThemeContext';
 import type { Show, Categories, FormData } from '../../../types';
 
 // Enable LayoutAnimation for Android
@@ -31,6 +31,7 @@ interface ExpandableShowCardProps {
 
 const ExpandableShowCard: React.FC<ExpandableShowCardProps> = ({ show, onEdit, onDelete }) => {
   const [expanded, setExpanded] = useState(false);
+  const { theme } = useTheme();
 
   const toggleExpanded = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -38,20 +39,22 @@ const ExpandableShowCard: React.FC<ExpandableShowCardProps> = ({ show, onEdit, o
   };
 
   const getRatingColor = (rating: number): string => {
-    if (rating >= 8) return '#10b981'; // Green for great shows
-    if (rating >= 6) return '#f59e0b'; // Yellow for good shows
-    return '#ef4444'; // Red for poor shows
+    if (rating >= 8) return theme.colors.ratingExcellent;
+    if (rating >= 6) return theme.colors.ratingGood;
+    return theme.colors.ratingPoor;
   };
 
   const getStatusColor = (status: string): string => {
     switch (status) {
-      case 'Currently Watching': return '#3b82f6';
-      case 'Completed': return '#10b981';
-      case 'On Hold': return '#f59e0b';
-      case 'Plan to Watch': return '#6b7280';
-      default: return '#6b7280';
+      case 'Currently Watching': return theme.colors.statusWatching;
+      case 'Completed': return theme.colors.statusCompleted;
+      case 'On Hold': return theme.colors.statusOnHold;
+      case 'Plan to Watch': return theme.colors.statusPlanToWatch;
+      default: return theme.colors.statusPlanToWatch;
     }
   };
+
+  const styles = createStyles(theme);
 
   return (
     <View style={styles.showCard}>
@@ -72,7 +75,7 @@ const ExpandableShowCard: React.FC<ExpandableShowCardProps> = ({ show, onEdit, o
               <Ionicons 
                 name={expanded ? "chevron-up" : "chevron-down"} 
                 size={20} 
-                color="#6b7280" 
+                color={theme.colors.textSecondary} 
               />
             </View>
           </View>
@@ -146,7 +149,7 @@ const ExpandableShowCard: React.FC<ExpandableShowCardProps> = ({ show, onEdit, o
               onPress={() => onEdit(show)} 
               style={[styles.actionButton, styles.editButton]}
             >
-              <Ionicons name="create" size={16} color="#3b82f6" />
+              <Ionicons name="create" size={16} color={theme.colors.secondary} />
               <Text style={styles.editButtonText}>Edit</Text>
             </TouchableOpacity>
             
@@ -154,7 +157,7 @@ const ExpandableShowCard: React.FC<ExpandableShowCardProps> = ({ show, onEdit, o
               onPress={() => onDelete(show.id)} 
               style={[styles.actionButton, styles.deleteButton]}
             >
-              <Ionicons name="trash" size={16} color="#ef4444" />
+              <Ionicons name="trash" size={16} color={theme.colors.error} />
               <Text style={styles.deleteButtonText}>Delete</Text>
             </TouchableOpacity>
           </View>
@@ -166,6 +169,7 @@ const ExpandableShowCard: React.FC<ExpandableShowCardProps> = ({ show, onEdit, o
 
 export default function ShowTracker() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const [shows, setShows] = useState<Show[]>([]);
   const [categories, setCategories] = useState<Categories>({
     genres: ['Drama', 'Comedy', 'Sci-Fi', 'Action', 'Documentary'],
@@ -183,6 +187,8 @@ export default function ShowTracker() {
     dateWatched: new Date().toISOString().split('T')[0],
     notes: ''
   });
+
+  const styles = createStyles(theme);
 
   const loadData = useCallback(async () => {
     try {
@@ -209,12 +215,10 @@ export default function ShowTracker() {
     }
   }, [shows, categories]);
 
-  // Load data on mount
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Save data on changes
   useEffect(() => {
     if (shows.length > 0 || categories.genres.length > 5) {
       saveData();
@@ -313,7 +317,7 @@ export default function ShowTracker() {
           <Text style={formData.status ? styles.pickerText : styles.pickerPlaceholder}>
             {formData.status || 'Select Status'}
           </Text>
-          <Ionicons name="chevron-down" size={20} color="#666" />
+          <Ionicons name="chevron-down" size={20} color={theme.colors.textSecondary} />
         </TouchableOpacity>
 
         <Modal visible={pickerVisible} transparent animationType="slide">
@@ -322,7 +326,7 @@ export default function ShowTracker() {
               <View style={styles.pickerHeader}>
                 <Text style={styles.pickerTitle}>Select Status</Text>
                 <TouchableOpacity onPress={() => setPickerVisible(false)}>
-                  <Ionicons name="close" size={24} color="#000" />
+                  <Ionicons name="close" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
               </View>
               <ScrollView>
@@ -337,7 +341,7 @@ export default function ShowTracker() {
                   >
                     <Text style={styles.pickerOptionText}>{status}</Text>
                     {formData.status === status && (
-                      <Ionicons name="checkmark" size={20} color="#10b981" />
+                      <Ionicons name="checkmark" size={20} color={theme.colors.success} />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -361,7 +365,7 @@ export default function ShowTracker() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {shows.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="tv-outline" size={64} color="#9ca3af" />
+            <Ionicons name="tv-outline" size={64} color={theme.colors.textTertiary} />
             <Text style={styles.emptyText}>No shows tracked yet</Text>
             <Text style={styles.emptySubtext}>Tap the + button to add your first show!</Text>
           </View>
@@ -384,7 +388,7 @@ export default function ShowTracker() {
         )}
       </ScrollView>
 
-      {/* Show Modal - keeping existing modal code unchanged */}
+      {/* Modal with theme support */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -392,7 +396,7 @@ export default function ShowTracker() {
               {editingShow ? 'Edit Show' : 'Add New Show'}
             </Text>
             <TouchableOpacity onPress={resetForm}>
-              <Ionicons name="close" size={24} color="#000" />
+              <Ionicons name="close" size={24} color={theme.colors.text} />
             </TouchableOpacity>
           </View>
           
@@ -402,6 +406,7 @@ export default function ShowTracker() {
               <TextInput
                 style={styles.input}
                 placeholder="Enter show name"
+                placeholderTextColor={theme.colors.textTertiary}
                 value={formData.name}
                 onChangeText={(text) => setFormData({...formData, name: text})}
               />
@@ -440,6 +445,7 @@ export default function ShowTracker() {
               <TextInput
                 style={styles.input}
                 placeholder="Enter rating"
+                placeholderTextColor={theme.colors.textTertiary}
                 value={formData.rating}
                 onChangeText={(text) => setFormData({...formData, rating: text})}
                 keyboardType="numeric"
@@ -452,6 +458,7 @@ export default function ShowTracker() {
                 <TextInput
                   style={styles.input}
                   placeholder="Season"
+                  placeholderTextColor={theme.colors.textTertiary}
                   value={formData.season}
                   onChangeText={(text) => setFormData({...formData, season: text})}
                   keyboardType="numeric"
@@ -462,6 +469,7 @@ export default function ShowTracker() {
                 <TextInput
                   style={styles.input}
                   placeholder="Episode"
+                  placeholderTextColor={theme.colors.textTertiary}
                   value={formData.episode}
                   onChangeText={(text) => setFormData({...formData, episode: text})}
                   keyboardType="numeric"
@@ -474,6 +482,7 @@ export default function ShowTracker() {
               <TextInput
                 style={styles.input}
                 placeholder="YYYY-MM-DD"
+                placeholderTextColor={theme.colors.textTertiary}
                 value={formData.dateWatched}
                 onChangeText={(text) => setFormData({...formData, dateWatched: text})}
               />
@@ -484,6 +493,7 @@ export default function ShowTracker() {
               <TextInput
                 style={styles.notesInput}
                 placeholder="Any additional notes..."
+                placeholderTextColor={theme.colors.textTertiary}
                 value={formData.notes}
                 onChangeText={(text) => setFormData({...formData, notes: text})}
                 multiline
@@ -504,10 +514,11 @@ export default function ShowTracker() {
   );
 }
 
-const styles = StyleSheet.create({
+// Dynamic styles function that adapts to theme
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.colors.background,
   },
   content: {
     flex: 1,
@@ -520,12 +531,12 @@ const styles = StyleSheet.create({
   listTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1f2937',
+    color: theme.colors.text,
     marginBottom: 4,
   },
   listSubtitle: {
     fontSize: 16,
-    color: '#6b7280',
+    color: theme.colors.textSecondary,
   },
   fab: {
     position: 'absolute',
@@ -534,11 +545,11 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#10b981',
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 8,
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -553,27 +564,29 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#6b7280',
+    color: theme.colors.textSecondary,
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 16,
-    color: '#9ca3af',
+    color: theme.colors.textTertiary,
     textAlign: 'center',
   },
   
-  // New expandable card styles
+  // Themed card styles
   showCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     marginBottom: 12,
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: theme.mode === 'dark' ? 0.3 : 0.1,
     shadowRadius: 8,
     elevation: 3,
     overflow: 'hidden',
+    borderWidth: theme.mode === 'dark' ? 1 : 0,
+    borderColor: theme.colors.border,
   },
   cardHeader: {
     padding: 16,
@@ -589,7 +602,7 @@ const styles = StyleSheet.create({
   showTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.colors.text,
     flex: 1,
     marginRight: 12,
     lineHeight: 24,
@@ -629,7 +642,7 @@ const styles = StyleSheet.create({
   episodeInfo: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#6b7280',
+    color: theme.colors.textSecondary,
   },
   
   // Expanded content styles
@@ -637,7 +650,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: theme.colors.divider,
   },
   detailsGrid: {
     gap: 12,
@@ -652,13 +665,13 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#6b7280',
+    color: theme.colors.textSecondary,
     flex: 1,
     marginRight: 12,
   },
   detailValue: {
     fontSize: 14,
-    color: '#1f2937',
+    color: theme.colors.text,
     flex: 2,
     textAlign: 'right',
   },
@@ -670,14 +683,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   genreTag: {
-    backgroundColor: '#e5e7eb',
+    backgroundColor: theme.colors.surfaceSecondary,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
+    borderWidth: theme.mode === 'dark' ? 1 : 0,
+    borderColor: theme.colors.border,
   },
   genreText: {
     fontSize: 12,
-    color: '#374151',
+    color: theme.colors.text,
     fontWeight: '500',
   },
   ratingContainer: {
@@ -687,11 +702,11 @@ const styles = StyleSheet.create({
   },
   ratingScale: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.colors.textSecondary,
   },
   notesText: {
     fontSize: 14,
-    color: '#1f2937',
+    color: theme.colors.text,
     flex: 2,
     textAlign: 'right',
     fontStyle: 'italic',
@@ -712,28 +727,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   editButton: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#3b82f6',
+    backgroundColor: theme.mode === 'dark' ? theme.colors.primaryLight : '#eff6ff',
+    borderColor: theme.colors.secondary,
   },
   editButtonText: {
-    color: '#3b82f6',
+    color: theme.colors.secondary,
     fontSize: 14,
     fontWeight: '500',
   },
   deleteButton: {
-    backgroundColor: '#fef2f2',
-    borderColor: '#ef4444',
+    backgroundColor: theme.mode === 'dark' ? theme.colors.errorLight : '#fef2f2',
+    borderColor: theme.colors.error,
   },
   deleteButtonText: {
-    color: '#ef4444',
+    color: theme.colors.error,
     fontSize: 14,
     fontWeight: '500',
   },
 
-  // Existing modal styles (unchanged)
+  // Modal styles with theme support
   modalContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -742,12 +757,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: theme.colors.border,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.colors.text,
   },
   modalContent: {
     flex: 1,
@@ -760,26 +775,28 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#374151',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
+    color: theme.colors.text,
   },
   notesInput: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
+    color: theme.colors.text,
     height: 80,
   },
   rowInputs: {
@@ -800,16 +817,16 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    backgroundColor: '#fff',
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
   },
   genreOptionSelected: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
+    backgroundColor: theme.colors.secondary,
+    borderColor: theme.colors.secondary,
   },
   genreOptionText: {
     fontSize: 14,
-    color: '#374151',
+    color: theme.colors.text,
   },
   genreOptionTextSelected: {
     color: '#fff',
@@ -819,27 +836,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
   },
   pickerText: {
     fontSize: 16,
-    color: '#1f2937',
+    color: theme.colors.text,
   },
   pickerPlaceholder: {
     fontSize: 16,
-    color: '#9ca3af',
+    color: theme.colors.textTertiary,
   },
   pickerModal: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'flex-end',
   },
   pickerContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     maxHeight: '50%',
@@ -851,12 +868,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: theme.colors.border,
   },
   pickerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.colors.text,
   },
   pickerOption: {
     flexDirection: 'row',
@@ -865,14 +882,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: theme.colors.divider,
   },
   pickerOptionText: {
     fontSize: 16,
-    color: '#1f2937',
+    color: theme.colors.text,
   },
   submitButton: {
-    backgroundColor: '#10b981',
+    backgroundColor: theme.colors.primary,
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',
