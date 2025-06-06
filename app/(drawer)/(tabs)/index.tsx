@@ -1,10 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Alert,
   Modal,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,8 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { DataManager } from '../../utils/dataManager';
-import type { Show, Categories, FormData } from '../../types';
+import type { Show, Categories, FormData } from '../../../types';
 
 export default function ShowTracker() {
   const insets = useSafeAreaInsets();
@@ -24,7 +22,6 @@ export default function ShowTracker() {
     statuses: ['Currently Watching', 'Completed', 'On Hold', 'Plan to Watch']
   });
   const [showModal, setShowModal] = useState<boolean>(false);
-  const [categoryModal, setCategoryModal] = useState<boolean>(false);
   const [editingShow, setEditingShow] = useState<Show | null>(null);
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -36,46 +33,46 @@ export default function ShowTracker() {
     dateWatched: new Date().toISOString().split('T')[0],
     notes: ''
   });
-  const [filenameModal, setFilenameModal] = useState<boolean>(false);
-  const [exportFilename, setExportFilename] = useState<string>('');
 
-  // Load data from AsyncStorage on mount
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Save data to AsyncStorage whenever shows or categories change
-  useEffect(() => {
-    if (shows.length > 0 || categories.genres.length > 5) {
-      saveData();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shows, categories]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const savedData = await AsyncStorage.getItem('showTrackerData');
       if (savedData) {
         const data = JSON.parse(savedData);
         setShows(data.shows || []);
-        setCategories(data.categories || categories);
+        setCategories(data.categories || {
+          genres: ['Drama', 'Comedy', 'Sci-Fi', 'Action', 'Documentary'],
+          statuses: ['Currently Watching', 'Completed', 'On Hold', 'Plan to Watch']
+        });
       }
     } catch (error) {
       console.error('Error loading data:', error);
     }
-  };
+  }, []);
 
-  const saveData = async () => {
+  const saveData = useCallback(async () => {
     try {
       const dataToSave = { shows, categories };
       await AsyncStorage.setItem('showTrackerData', JSON.stringify(dataToSave));
     } catch (error) {
       console.error('Error saving data:', error);
     }
-  };
+  }, [shows, categories]);
+
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Save data on changes
+  useEffect(() => {
+    if (shows.length > 0 || categories.genres.length > 5) {
+      saveData();
+    }
+  }, [shows, categories, saveData]);
 
   const handleSubmit = () => {
-    if ((!formData.name || formData.genres.length === 0) && !formData.status && !formData.rating && !formData.season && !formData.episode) {
+    if (!formData.name || formData.genres.length === 0 || !formData.status || !formData.rating || !formData.season || !formData.episode) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
@@ -117,9 +114,9 @@ export default function ShowTracker() {
       name: show.name,
       genres: show.genres || [],
       status: show.status,
-      rating: show.rating == null? '' : show.rating.toString(),
-      season: show.season == null? '' : show.season.toString(),
-      episode: show.episode == null? '' : show.episode.toString(),
+      rating: show.rating == null ? '' : show.rating.toString(),
+      season: show.season == null ? '' : show.season.toString(),
+      episode: show.episode == null ? '' : show.episode.toString(),
       dateWatched: show.dateWatched,
       notes: show.notes || ''
     });
@@ -140,46 +137,6 @@ export default function ShowTracker() {
     );
   };
 
-  const addCategory = (type: keyof Categories, value: string) => {
-    if (value && !categories[type].includes(value)) {
-      setCategories({
-        ...categories,
-        [type]: [...categories[type], value]
-      });
-    }
-  };
-
-  const removeCategory = (type: string, value: string) => {
-    setCategories({
-      ...categories,
-      [type]: categories[type].filter((cat: string) => cat !== value)
-    });
-  };
-
-  const exportData = async (): Promise<void> => {
-    const defaultName = `showtracker-backup-${new Date().toISOString().split('T')[0]}`;
-    setExportFilename(defaultName);
-    setFilenameModal(true);
-  };
-  
-  const handleExportWithFilename = async (): Promise<void> => {
-    const sanitizedFilename = exportFilename.trim().replace(/[<>:"/\\|?*]/g, '-') || 
-      `showtracker-backup-${new Date().toISOString().split('T')[0]}`;
-    
-    setFilenameModal(false);
-    await DataManager.exportData(shows, categories, sanitizedFilename);
-    setExportFilename('');
-  };
-  
-  const importData = async (): Promise<void> => {
-    const importedData = await DataManager.importData();
-    if (importedData) {
-      setShows(importedData.shows);
-      setCategories(importedData.categories);
-      Alert.alert('Success', 'Data imported successfully!');
-    }
-  };
-
   const toggleGenre = (genre: string) => {
     if (formData.genres.includes(genre)) {
       setFormData({
@@ -192,92 +149,6 @@ export default function ShowTracker() {
         genres: [...formData.genres, genre]
       });
     }
-  };
-
-  const CategoryManager = () => {
-    const [newGenre, setNewGenre] = useState('');
-    const [newStatus, setNewStatus] = useState('');
-
-    const handleAddGenre = () => {
-      if (newGenre.trim()) {
-        addCategory('genres', newGenre.trim());
-        setNewGenre('');
-      }
-    };
-
-    const handleAddStatus = () => {
-      if (newStatus.trim()) {
-        addCategory('statuses', newStatus.trim());
-        setNewStatus('');
-      }
-    };
-
-    return (
-      <Modal visible={categoryModal} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Manage Categories</Text>
-            <TouchableOpacity onPress={() => setCategoryModal(false)}>
-              <Ionicons name="close" size={24} color="#000" />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.categorySection}>
-              <Text style={styles.categoryTitle}>Genres</Text>
-              {categories.genres.map(genre => (
-                <View key={genre} style={styles.categoryItem}>
-                  <Text style={styles.categoryText}>{genre}</Text>
-                  <TouchableOpacity
-                    onPress={() => removeCategory('genres', genre)}
-                    style={styles.deleteButton}
-                  >
-                    <Ionicons name="trash" size={16} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              <View style={styles.addCategoryRow}>
-                <TextInput
-                  style={styles.addCategoryInput}
-                  placeholder="Add new genre"
-                  value={newGenre}
-                  onChangeText={setNewGenre}
-                />
-                <TouchableOpacity onPress={handleAddGenre} style={styles.addButton}>
-                  <Text style={styles.addButtonText}>Add</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.categorySection}>
-              <Text style={styles.categoryTitle}>Statuses</Text>
-              {categories.statuses.map(status => (
-                <View key={status} style={styles.categoryItem}>
-                  <Text style={styles.categoryText}>{status}</Text>
-                  <TouchableOpacity
-                    onPress={() => removeCategory('statuses', status)}
-                    style={styles.deleteButton}
-                  >
-                    <Ionicons name="trash" size={16} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              <View style={styles.addCategoryRow}>
-                <TextInput
-                  style={styles.addCategoryInput}
-                  placeholder="Add new status"
-                  value={newStatus}
-                  onChangeText={setNewStatus}
-                />
-                <TouchableOpacity onPress={handleAddStatus} style={styles.addButton}>
-                  <Text style={styles.addButtonText}>Add</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
-    );
   };
 
   const StatusPicker = () => {
@@ -329,41 +200,20 @@ export default function ShowTracker() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Show Tracker</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity
-            onPress={() => setCategoryModal(true)}
-            style={styles.headerButton}
-          >
-            <Text style={styles.headerButtonText}>Categories</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setShowModal(true)}
-            style={[styles.headerButton, styles.addButton]}
-          >
-            <Ionicons name="add" size={20} color="#fff" />
-            <Text style={styles.addButtonText}>Add Show</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.exportButtons}>
-        <TouchableOpacity onPress={exportData} style={styles.exportButton}>
-          <Ionicons name="download" size={16} color="#fff" />
-          <Text style={styles.exportButtonText}>Export</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={importData} style={[styles.exportButton, styles.importButton]}>
-          <Ionicons name="cloud-upload" size={16} color="#fff" />
-          <Text style={styles.exportButtonText}>Import</Text>
-        </TouchableOpacity>
-      </View>
+    <View style={[styles.container, { paddingBottom: insets.bottom + 80 }]}>
+      <TouchableOpacity
+        onPress={() => setShowModal(true)}
+        style={styles.fab}
+      >
+        <Ionicons name="add" size={24} color="#fff" />
+      </TouchableOpacity>
 
       <ScrollView style={styles.content}>
         {shows.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No shows tracked yet. Add your first show!</Text>
+            <Ionicons name="tv-outline" size={64} color="#9ca3af" />
+            <Text style={styles.emptyText}>No shows tracked yet</Text>
+            <Text style={styles.emptySubtext}>Tap the + button to add your first show!</Text>
           </View>
         ) : (
           shows.map(show => (
@@ -412,8 +262,9 @@ export default function ShowTracker() {
         )}
       </ScrollView>
 
+      {/* Show Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
               {editingShow ? 'Edit Show' : 'Add New Show'}
@@ -525,48 +376,6 @@ export default function ShowTracker() {
               </Text>
             </TouchableOpacity>
           </ScrollView>
-        </SafeAreaView>
-      </Modal>
-
-      <CategoryManager />
-
-      <Modal visible={filenameModal} transparent animationType="slide">
-        <View style={styles.pickerModal}>
-          <View style={styles.filenameModalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Export Filename</Text>
-              <TouchableOpacity onPress={() => setFilenameModal(false)}>
-                <Ionicons name="close" size={24} color="#000" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.filenameContent}>
-              <Text style={styles.label}>Enter filename (without .json extension):</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter filename"
-                value={exportFilename}
-                onChangeText={setExportFilename}
-                autoFocus
-              />
-              
-              <View style={styles.filenameButtons}>
-                <TouchableOpacity 
-                  onPress={() => setFilenameModal(false)}
-                  style={[styles.filenameButton, styles.cancelButton]}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  onPress={handleExportWithFilename}
-                  style={[styles.filenameButton, styles.exportConfirmButton]}
-                >
-                  <Text style={styles.exportConfirmButtonText}>Export</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
         </View>
       </Modal>
     </View>
@@ -578,87 +387,51 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
-  header: {
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  headerButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#3b82f6',
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  headerButtonText: {
-    color: '#fff',
-    fontWeight: '500',
-  },
-  addButton: {
-    backgroundColor: '#10b981',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontWeight: '500',
-  },
-  exportButtons: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  exportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#6b7280',
-    borderRadius: 6,
-  },
-  exportButtonText: {
-    color: '#000000',
-    fontWeight: '300',
-  },
-  importButton: {
-    backgroundColor: '#3b82f6',
-  },
   content: {
     flex: 1,
     paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#10b981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    zIndex: 1000,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 48,
+    paddingVertical: 64,
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: 20,
+    fontWeight: '600',
     color: '#6b7280',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 16,
+    color: '#9ca3af',
     textAlign: 'center',
   },
   showCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    marginVertical: 8,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -682,7 +455,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    padding: 4,
+    padding: 8,
   },
   showDetails: {
     gap: 4,
@@ -847,80 +620,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  categorySection: {
-    marginBottom: 24,
-  },
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 12,
-  },
-  categoryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    marginBottom: 4,
-  },
-  categoryText: {
-    fontSize: 14,
-    color: '#1f2937',
-  },
-  deleteButton: {
-    padding: 4,
-  },
-  addCategoryRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-  },
-  addCategoryInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-  },
-  filenameModalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    maxHeight: '40%',
-    minHeight: 200,
-  },
-  filenameContent: {
-    padding: 16,
-  },
-  filenameButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-  },
-  filenameButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#6b7280',
-  },
-  cancelButtonText: {
-    color: '#fff',
-    fontWeight: '500',
-  },
-  exportConfirmButton: {
-    backgroundColor: '#10b981',
-  },
-  exportConfirmButtonText: {
-    color: '#fff',
-    fontWeight: '500',
   },
 });
