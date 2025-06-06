@@ -3,9 +3,19 @@ import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { Alert } from 'react-native';
 import type { AppData, Show, Categories } from '../types';
+import versionInfo from '../version.json'; 
 
 export class DataManager {
-  private static readonly VERSION = "1.0";
+  private static readonly VERSION = versionInfo.version.split('.').slice(0, 2).join('.'); // "2.0" from "2.0.0"
+
+  // Add this public getter method
+  static getVersion(): string {
+    return this.VERSION;
+  }
+
+  static getFullVersion(): string {
+    return versionInfo.version; // "2.0.0"
+  }
 
   static async exportData(shows: Show[], categories: Categories, customFilename?: string): Promise<void> {
     try {
@@ -57,6 +67,7 @@ export class DataManager {
       try {
         // Try direct read first
         fileContent = await FileSystem.readAsStringAsync(asset.uri);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (directReadError: unknown) {
         console.log('Direct read failed, trying copy method...');
         

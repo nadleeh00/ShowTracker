@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, type ThemeMode } from '../contexts/ThemeContext';
+import { DataManager } from '@/utils/dataManager';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -18,7 +19,7 @@ export default function SettingsScreen() {
   const showAbout = () => {
     Alert.alert(
       'About Show Tracker',
-      'Version 1.0.0\n\nA personal TV show tracking app built with React Native and Expo.\n\nFeatures:\n• Expandable show cards\n• Dark mode support\n• Export/Import functionality\n• Custom categories',
+      `Version ${DataManager.getVersion()}\n\nA personal TV show tracking app built with React Native and Expo.\n\nFeatures:\n• Expandable show cards\n• Dark mode support\n• Export/Import functionality\n• Custom categories\n\nWhat's New in v${DataManager.getVersion()}:\n• Modern expandable card UI\n• Complete dark mode system\n• Enhanced navigation structure`,
       [{ text: 'OK' }]
     );
   };
@@ -233,7 +234,9 @@ export default function SettingsScreen() {
               <Ionicons name="information-circle-outline" size={20} color={theme.colors.textSecondary} />
               <View style={styles.settingText}>
                 <Text style={[styles.settingLabel, { color: theme.colors.text }]}>About Show Tracker</Text>
-                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>Version 1.0.0 • Built with Expo</Text>
+                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
+                    Version {DataManager.getVersion()} • Built with Expo
+                </Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />

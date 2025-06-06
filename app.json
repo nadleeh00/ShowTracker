@@ -2,14 +2,15 @@
   "expo": {
     "name": "Show Tracker",
     "slug": "ShowTracker",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "showtracker",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +18,8 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.ShowTracker"
+      "package": "com.anonymous.ShowTracker",
+      "versionCode": 2
     },
     "web": {
       "bundler": "metro",
