@@ -1,16 +1,16 @@
+import { DataManager } from '@/utils/dataManager';
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, type ThemeMode } from '../contexts/ThemeContext';
-import { DataManager } from '@/utils/dataManager';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();

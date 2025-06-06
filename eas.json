@@ -9,11 +9,7 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleDebug",
-        "applicationId": "com.anonymous.ShowTracker.dev"
-      },
-      "env": {
-        "APP_NAME": "Show-Tracker-Dev"
+        "gradleCommand": ":app:assembleDebug"
       }
     },
     "preview": {

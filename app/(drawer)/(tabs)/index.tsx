@@ -1,22 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  LayoutAnimation,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  LayoutAnimation,
-  Platform,
   UIManager,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { Categories, FormData, Show } from '../../../types';
 import { useTheme } from '../../contexts/ThemeContext';
-import type { Show, Categories, FormData } from '../../../types';
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
