@@ -15,7 +15,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Categories, FormData, Show } from '../../../types';
+import type { Categories, FormData, MediaItem } from '../../../types';
+import { DataMigrator } from '../../../utils/dataMigrator';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // Enable LayoutAnimation for Android
@@ -24,12 +25,12 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 interface ExpandableShowCardProps {
-  show: Show;
-  onEdit: (show: Show) => void;
+  item: MediaItem;  // Changed from show: MediaItem
+  onEdit: (item: MediaItem) => void;
   onDelete: (id: number) => void;
 }
 
-const ExpandableShowCard: React.FC<ExpandableShowCardProps> = ({ show, onEdit, onDelete }) => {
+const ExpandableShowCard: React.FC<ExpandableShowCardProps> = ({ item, onEdit, onDelete }) => {
   const [expanded, setExpanded] = useState(false);
   const { theme } = useTheme();
 
@@ -66,26 +67,38 @@ const ExpandableShowCard: React.FC<ExpandableShowCardProps> = ({ show, onEdit, o
         <View style={styles.headerContent}>
           <View style={styles.titleRow}>
             <Text style={styles.showTitle} numberOfLines={expanded ? 0 : 2}>
-              {show.name}
+              {item.name}
             </Text>
             <View style={styles.headerIndicators}>
-              <View style={[styles.ratingBadge, { backgroundColor: getRatingColor(show.rating) }]}>
-                <Text style={styles.ratingText}>{show.rating}</Text>
-              </View>
-              <Ionicons 
-                name={expanded ? "chevron-up" : "chevron-down"} 
-                size={20} 
-                color={theme.colors.textSecondary} 
+              {item.rating ? (
+                <View style={[styles.ratingBadge, { backgroundColor: getRatingColor(item.rating) }]}>
+                  <Text style={styles.ratingText}>{item.rating}</Text>
+                </View>
+              ) : (
+                <View style={[styles.ratingBadge, { backgroundColor: theme.colors.border }]}>
+                  <Text style={[styles.ratingText, styles.dimmedText]}>-</Text>
+                </View>
+              )}
+              <Ionicons
+                name={expanded ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={theme.colors.textSecondary}
               />
             </View>
           </View>
-          
+
           {!expanded && (
             <View style={styles.compactInfo}>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(show.status) }]}>
-                <Text style={styles.statusText}>{show.status}</Text>
-              </View>
-              <Text style={styles.episodeInfo}>S{show.season}E{show.episode}</Text>
+              {item.status && (
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                  <Text style={styles.statusText}>{item.status}</Text>
+                </View>
+              )}
+              {item.mediaType === 'show' && (item.season || item.episode) && (
+                <Text style={styles.episodeInfo}>
+                  S{item.season || '-'}E{item.episode || '-'}
+                </Text>
+              )}
             </View>
           )}
         </View>
@@ -94,71 +107,100 @@ const ExpandableShowCard: React.FC<ExpandableShowCardProps> = ({ show, onEdit, o
       {expanded && (
         <View style={styles.expandedContent}>
           <View style={styles.detailsGrid}>
+            {/* Media Type */}
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Genres</Text>
+              <Text style={styles.detailLabel}>Type</Text>
+              <Text style={styles.detailValue}>
+                {item.mediaType === 'movie' ? '🎬 Movie' : '📺 TV Show'}
+              </Text>
+            </View>
+
+            {/* Genres/Tags */}
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Tags</Text>
               <View style={styles.genreContainer}>
-                {show.genres && show.genres.length > 0 ? (
-                  show.genres.map((genre, index) => (
+                {item.genres && item.genres.length > 0 ? (
+                  item.genres.map((genre, index) => (
                     <View key={index} style={styles.genreTag}>
                       <Text style={styles.genreText}>{genre}</Text>
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.detailValue}>None</Text>
+                  <Text style={[styles.detailValue, styles.dimmedText]}>No tags</Text>
                 )}
               </View>
             </View>
 
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Status</Text>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(show.status) }]}>
-                <Text style={styles.statusText}>{show.status}</Text>
+            {/* Status */}
+            {item.status && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Status</Text>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                  <Text style={styles.statusText}>{item.status}</Text>
+                </View>
               </View>
-            </View>
+            )}
 
+            {/* Rating */}
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Rating</Text>
-              <View style={styles.ratingContainer}>
-                <View style={[styles.ratingBadge, { backgroundColor: getRatingColor(show.rating) }]}>
-                  <Text style={styles.ratingText}>{show.rating}</Text>
+              {item.rating ? (
+                <View style={styles.ratingContainer}>
+                  <View style={[styles.ratingBadge, { backgroundColor: getRatingColor(item.rating) }]}>
+                    <Text style={styles.ratingText}>{item.rating}</Text>
+                  </View>
+                  <Text style={styles.ratingScale}>/ 10</Text>
                 </View>
-                <Text style={styles.ratingScale}>/ 10</Text>
+              ) : (
+                <Text style={[styles.detailValue, styles.dimmedText]}>-</Text>
+              )}
+            </View>
+
+            {/* Progress (only for shows) */}
+            {item.mediaType === 'show' && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Progress</Text>
+                <Text style={styles.detailValue}>
+                  {item.season || item.episode
+                    ? `Season ${item.season || '-'}, Episode ${item.episode || '-'}`
+                    : 'Not started'
+                  }
+                </Text>
               </View>
-            </View>
+            )}
 
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Progress</Text>
-              <Text style={styles.detailValue}>Season {show.season}, Episode {show.episode}</Text>
-            </View>
+            {/* Date Watched */}
+            {item.dateWatched && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Last Watched</Text>
+                <Text style={styles.detailValue}>{item.dateWatched}</Text>
+              </View>
+            )}
 
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Last Watched</Text>
-              <Text style={styles.detailValue}>{show.dateWatched}</Text>
-            </View>
-
-            {show.notes && (
+            {/* Notes */}
+            {item.notes && (
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Notes</Text>
-                <Text style={styles.notesText}>{show.notes}</Text>
+                <Text style={styles.notesText}>{item.notes}</Text>
               </View>
             )}
           </View>
 
           <View style={styles.actionBar}>
-            <TouchableOpacity 
-              onPress={() => onEdit(show)} 
+            <TouchableOpacity
+              onPress={() => onEdit(item)}
               style={[styles.actionButton, styles.editButton]}
             >
-              <Ionicons name="create" size={16} color={theme.colors.secondary} />
-              <Text style={styles.editButtonText}>Edit</Text>
+              <Ionicons name="pencil" size={20} color="#fff" />
+              <Text style={styles.actionButtonText}>Edit</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              onPress={() => onDelete(show.id)} 
+
+            <TouchableOpacity
+              onPress={() => onDelete(item.id)}
               style={[styles.actionButton, styles.deleteButton]}
             >
-              <Ionicons name="trash" size={16} color={theme.colors.error} />
-              <Text style={styles.deleteButtonText}>Delete</Text>
+              <Ionicons name="trash" size={20} color="#fff" />
+              <Text style={styles.actionButtonText}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -170,15 +212,16 @@ const ExpandableShowCard: React.FC<ExpandableShowCardProps> = ({ show, onEdit, o
 export default function ShowTracker() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const [shows, setShows] = useState<Show[]>([]);
+  const [shows, setShows] = useState<MediaItem[]>([]);
   const [categories, setCategories] = useState<Categories>({
     genres: ['Drama', 'Comedy', 'Sci-Fi', 'Action', 'Documentary'],
     statuses: ['Currently Watching', 'Completed', 'On Hold', 'Plan to Watch']
   });
   const [showModal, setShowModal] = useState<boolean>(false);
-  const [editingShow, setEditingShow] = useState<Show | null>(null);
+  const [editingShow, setEditingShow] = useState<MediaItem | null>(null);
   const [formData, setFormData] = useState<FormData>({
     name: '',
+    mediaType: 'show',
     genres: [],
     status: '',
     rating: '',
@@ -188,18 +231,65 @@ export default function ShowTracker() {
     notes: ''
   });
 
+  // Task 7 Step 1: Add filter state
+  const [activeTab, setActiveTab] = useState<'all' | 'movies' | 'shows'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGenre, setSelectedGenre] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+
   const styles = createStyles(theme);
+
+  // Task 7 Step 2: Create filtered items computation
+  const filteredItems = shows.filter(item => {
+    // Tab filter
+    if (activeTab === 'movies' && item.mediaType !== 'movie') return false;
+    if (activeTab === 'shows' && item.mediaType !== 'show') return false;
+
+    // Search filter
+    if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+
+    // Genre filter
+    if (selectedGenre && (!item.genres || !item.genres.includes(selectedGenre))) {
+      return false;
+    }
+
+    // Status filter
+    if (selectedStatus && item.status !== selectedStatus) {
+      return false;
+    }
+
+    return true;
+  });
 
   const loadData = useCallback(async () => {
     try {
       const savedData = await AsyncStorage.getItem('showTrackerData');
       if (savedData) {
-        const data = JSON.parse(savedData);
-        setShows(data.shows || []);
-        setCategories(data.categories || {
-          genres: ['Drama', 'Comedy', 'Sci-Fi', 'Action', 'Documentary'],
-          statuses: ['Currently Watching', 'Completed', 'On Hold', 'Plan to Watch']
-        });
+        const parsedData = JSON.parse(savedData);
+
+        // Check if old format and migrate
+        if (DataMigrator.isOldFormat(parsedData)) {
+          const migratedData = DataMigrator.migrate(parsedData);
+          setShows(migratedData.mediaItems);
+          setCategories(migratedData.categories);
+
+          // Save migrated data back to AsyncStorage
+          await AsyncStorage.setItem('showTrackerData', JSON.stringify(migratedData));
+
+          console.log('Migrated v2.0 data to v3.0');
+        } else if (DataMigrator.isNewFormat(parsedData)) {
+          setShows(parsedData.mediaItems);
+          setCategories(parsedData.categories);
+        } else {
+          // Legacy: direct array (very old format)
+          setShows([]);
+          setCategories({
+            genres: ['Drama', 'Comedy', 'Sci-Fi', 'Action', 'Documentary'],
+            statuses: ['Currently Watching', 'Completed', 'On Hold', 'Plan to Watch']
+          });
+        }
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -208,16 +298,39 @@ export default function ShowTracker() {
 
   const saveData = useCallback(async () => {
     try {
-      const dataToSave = { shows, categories };
+      const dataToSave = {
+        mediaItems: shows,
+        categories: categories,
+        exportDate: new Date().toISOString(),
+        version: '3.0.0'
+      };
       await AsyncStorage.setItem('showTrackerData', JSON.stringify(dataToSave));
     } catch (error) {
       console.error('Error saving data:', error);
     }
   }, [shows, categories]);
 
+  // Task 8 Step 1: Load filter state on mount
+  const loadFilterState = useCallback(async () => {
+    try {
+      const savedTab = await AsyncStorage.getItem('activeTab');
+      const savedSearch = await AsyncStorage.getItem('searchQuery');
+      const savedGenre = await AsyncStorage.getItem('selectedGenre');
+      const savedStatus = await AsyncStorage.getItem('selectedStatus');
+
+      if (savedTab) setActiveTab(savedTab as any);
+      if (savedSearch) setSearchQuery(savedSearch);
+      if (savedGenre) setSelectedGenre(savedGenre);
+      if (savedStatus) setSelectedStatus(savedStatus);
+    } catch (error) {
+      console.error('Error loading filter state:', error);
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    loadFilterState();
+  }, [loadData, loadFilterState]);
 
   useEffect(() => {
     if (shows.length > 0 || categories.genres.length > 5) {
@@ -225,24 +338,50 @@ export default function ShowTracker() {
     }
   }, [shows, categories, saveData]);
 
+  // Task 8 Step 2: Save filter state on changes
+  useEffect(() => {
+    AsyncStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    AsyncStorage.setItem('searchQuery', searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    AsyncStorage.setItem('selectedGenre', selectedGenre);
+  }, [selectedGenre]);
+
+  useEffect(() => {
+    AsyncStorage.setItem('selectedStatus', selectedStatus);
+  }, [selectedStatus]);
+
   const handleSubmit = () => {
-    if (!formData.name || formData.genres.length === 0 || !formData.status || !formData.rating || !formData.season || !formData.episode) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (!formData.name.trim()) {
+      Alert.alert('Error', 'Please enter a name');
       return;
     }
 
-    const newShow = {
+    const newItem: MediaItem = {
       id: editingShow ? editingShow.id : Date.now(),
-      ...formData,
-      rating: parseInt(formData.rating),
-      season: parseInt(formData.season),
-      episode: parseInt(formData.episode)
+      name: formData.name.trim(),
+      mediaType: formData.mediaType,
+
+      // Optional fields - only include if not empty
+      ...(formData.genres.length > 0 && { genres: formData.genres }),
+      ...(formData.status && { status: formData.status }),
+      ...(formData.rating && { rating: parseFloat(formData.rating) }),
+      ...(formData.dateWatched && { dateWatched: formData.dateWatched }),
+      ...(formData.notes.trim() && { notes: formData.notes.trim() }),
+
+      // Show-specific fields (only for TV shows)
+      ...(formData.mediaType === 'show' && formData.season && { season: parseInt(formData.season) }),
+      ...(formData.mediaType === 'show' && formData.episode && { episode: parseInt(formData.episode) }),
     };
 
     if (editingShow) {
-      setShows(shows.map(show => show.id === editingShow.id ? newShow : show));
+      setShows(shows.map(show => show.id === editingShow.id ? newItem : show));
     } else {
-      setShows([...shows, newShow]);
+      setShows([...shows, newItem]);
     }
 
     resetForm();
@@ -251,6 +390,7 @@ export default function ShowTracker() {
   const resetForm = () => {
     setFormData({
       name: '',
+      mediaType: 'show',
       genres: [],
       status: '',
       rating: '',
@@ -263,15 +403,16 @@ export default function ShowTracker() {
     setShowModal(false);
   };
 
-  const editShow = (show: Show) => {
+  const editShow = (show: MediaItem) => {
     setFormData({
       name: show.name,
+      mediaType: show.mediaType,
       genres: show.genres || [],
-      status: show.status,
+      status: show.status || '',
       rating: show.rating == null ? '' : show.rating.toString(),
       season: show.season == null ? '' : show.season.toString(),
       episode: show.episode == null ? '' : show.episode.toString(),
-      dateWatched: show.dateWatched,
+      dateWatched: show.dateWatched || new Date().toISOString().split('T')[0],
       notes: show.notes || ''
     });
     setEditingShow(show);
@@ -359,27 +500,143 @@ export default function ShowTracker() {
         onPress={() => setShowModal(true)}
         style={styles.fab}
       >
-        <Ionicons name="add" size={24} color="#fff" />
+        <Ionicons name="add" size={20} color="#fff" />
       </TouchableOpacity>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {shows.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="tv-outline" size={64} color={theme.colors.textTertiary} />
-            <Text style={styles.emptyText}>No shows tracked yet</Text>
-            <Text style={styles.emptySubtext}>Tap the + button to add your first show!</Text>
+      {/* Task 7 Step 3: Add tab selector and filters */}
+      <View style={styles.content}>
+        {/* Tab Selector */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'all' && styles.tabActive]}
+            onPress={() => setActiveTab('all')}
+          >
+            <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
+              All
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'movies' && styles.tabActive]}
+            onPress={() => setActiveTab('movies')}
+          >
+            <Text style={[styles.tabText, activeTab === 'movies' && styles.tabTextActive]}>
+              Movies
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'shows' && styles.tabActive]}
+            onPress={() => setActiveTab('shows')}
+          >
+            <Text style={[styles.tabText, activeTab === 'shows' && styles.tabTextActive]}>
+              TV Shows
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Filters */}
+        <View style={styles.filtersContainer}>
+          {/* Search */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search..."
+              placeholderTextColor={theme.colors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Genre Filter */}
+          <View style={styles.filterRow}>
+            <Text style={styles.filterLabel}>Genre:</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <TouchableOpacity
+                style={[styles.filterChip, !selectedGenre && styles.filterChipActive]}
+                onPress={() => setSelectedGenre('')}
+              >
+                <Text style={[styles.filterChipText, !selectedGenre && styles.filterChipTextActive]}>
+                  All
+                </Text>
+              </TouchableOpacity>
+              {categories.genres.map(genre => (
+                <TouchableOpacity
+                  key={genre}
+                  style={[styles.filterChip, selectedGenre === genre && styles.filterChipActive]}
+                  onPress={() => setSelectedGenre(genre)}
+                >
+                  <Text style={[styles.filterChipText, selectedGenre === genre && styles.filterChipTextActive]}>
+                    {genre}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Status Filter */}
+          <View style={styles.filterRow}>
+            <Text style={styles.filterLabel}>Status:</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <TouchableOpacity
+                style={[styles.filterChip, !selectedStatus && styles.filterChipActive]}
+                onPress={() => setSelectedStatus('')}
+              >
+                <Text style={[styles.filterChipText, !selectedStatus && styles.filterChipTextActive]}>
+                  All
+                </Text>
+              </TouchableOpacity>
+              {categories.statuses.map(status => (
+                <TouchableOpacity
+                  key={status}
+                  style={[styles.filterChip, selectedStatus === status && styles.filterChipActive]}
+                  onPress={() => setSelectedStatus(status)}
+                >
+                  <Text style={[styles.filterChipText, selectedStatus === status && styles.filterChipTextActive]}>
+                    {status}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </View>
+
+      <ScrollView
+        style={styles.contentList}
+        contentContainerStyle={filteredItems.length === 0 ? styles.emptyList : undefined}
+        showsVerticalScrollIndicator={false}
+      >
+        {filteredItems.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="film-outline" size={64} color={theme.colors.textSecondary} />
+            <Text style={styles.emptyTitle}>No items yet</Text>
+            <Text style={styles.emptySubtitle}>
+              Tap the + button to add your first {activeTab === 'movies' ? 'movie' : activeTab === 'shows' ? 'TV show' : 'item'}
+            </Text>
           </View>
         ) : (
           <>
             <View style={styles.listHeader}>
-              <Text style={styles.listTitle}>Your Shows</Text>
-              <Text style={styles.listSubtitle}>{shows.length} show{shows.length !== 1 ? 's' : ''} tracked</Text>
+              <Text style={styles.listTitle}>
+                {activeTab === 'all' ? 'All Media' : activeTab === 'movies' ? 'Movies' : 'TV Shows'}
+              </Text>
+              <Text style={styles.listSubtitle}>
+                {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
+                {shows.length !== filteredItems.length && ` (${shows.length} total)`}
+              </Text>
             </View>
-            
-            {shows.map(show => (
+
+            {filteredItems.map(show => (
               <ExpandableShowCard
                 key={show.id}
-                show={show}
+                item={show}
                 onEdit={editShow}
                 onDelete={deleteShow}
               />
@@ -401,11 +658,47 @@ export default function ShowTracker() {
           </View>
           
           <ScrollView style={styles.modalContent}>
+            {/* Media Type Selector */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Show Name</Text>
+              <Text style={styles.label}>Media Type *</Text>
+              <View style={styles.mediaTypeSelector}>
+                <TouchableOpacity
+                  style={[
+                    styles.mediaTypeButton,
+                    formData.mediaType === 'show' && styles.mediaTypeButtonActive
+                  ]}
+                  onPress={() => setFormData({ ...formData, mediaType: 'show' })}
+                >
+                  <Text style={[
+                    styles.mediaTypeText,
+                    formData.mediaType === 'show' && styles.mediaTypeTextActive
+                  ]}>
+                    TV Show
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.mediaTypeButton,
+                    formData.mediaType === 'movie' && styles.mediaTypeButtonActive
+                  ]}
+                  onPress={() => setFormData({ ...formData, mediaType: 'movie' })}
+                >
+                  <Text style={[
+                    styles.mediaTypeText,
+                    formData.mediaType === 'movie' && styles.mediaTypeTextActive
+                  ]}>
+                    Movie
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Name *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter show name"
+                placeholder="Enter name"
                 placeholderTextColor={theme.colors.textTertiary}
                 value={formData.name}
                 onChangeText={(text) => setFormData({...formData, name: text})}
@@ -452,30 +745,33 @@ export default function ShowTracker() {
               />
             </View>
 
-            <View style={styles.rowInputs}>
-              <View style={styles.halfInput}>
-                <Text style={styles.label}>Season</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Season"
-                  placeholderTextColor={theme.colors.textTertiary}
-                  value={formData.season}
-                  onChangeText={(text) => setFormData({...formData, season: text})}
-                  keyboardType="numeric"
-                />
+            {/* Season/Episode fields - only for TV shows */}
+            {formData.mediaType === 'show' && (
+              <View style={styles.rowInputs}>
+                <View style={styles.halfInput}>
+                  <Text style={styles.label}>Season</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Optional"
+                    placeholderTextColor={theme.colors.textTertiary}
+                    value={formData.season}
+                    onChangeText={(text) => setFormData({...formData, season: text})}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.halfInput}>
+                  <Text style={styles.label}>Episode</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Optional"
+                    placeholderTextColor={theme.colors.textTertiary}
+                    value={formData.episode}
+                    onChangeText={(text) => setFormData({...formData, episode: text})}
+                    keyboardType="numeric"
+                  />
+                </View>
               </View>
-              <View style={styles.halfInput}>
-                <Text style={styles.label}>Episode</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Episode"
-                  placeholderTextColor={theme.colors.textTertiary}
-                  value={formData.episode}
-                  onChangeText={(text) => setFormData({...formData, episode: text})}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
+            )}
 
             <View style={styles.formGroup}>
               <Text style={styles.label}>Date Watched</Text>
@@ -521,6 +817,10 @@ const createStyles = (theme: any) => StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   content: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  contentList: {
     flex: 1,
     paddingHorizontal: 16,
   },
@@ -540,11 +840,11 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 10,
-    right: 10,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    bottom: 20,
+    right: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -555,23 +855,27 @@ const createStyles = (theme: any) => StyleSheet.create({
     shadowRadius: 8,
     zIndex: 1000,
   },
-  emptyState: {
+  emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 64,
   },
-  emptyText: {
+  emptyTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
+    fontWeight: '700',
+    color: theme.colors.text,
     marginTop: 16,
-    marginBottom: 8,
   },
-  emptySubtext: {
-    fontSize: 16,
-    color: theme.colors.textTertiary,
+  emptySubtitle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginTop: 8,
     textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyList: {
+    flexGrow: 1,
   },
   
   // Themed card styles
@@ -675,6 +979,9 @@ const createStyles = (theme: any) => StyleSheet.create({
     flex: 2,
     textAlign: 'right',
   },
+  dimmedText: {
+    opacity: 0.5,
+  },
   genreContainer: {
     flex: 2,
     flexDirection: 'row',
@@ -724,25 +1031,17 @@ const createStyles = (theme: any) => StyleSheet.create({
     gap: 6,
     paddingVertical: 10,
     borderRadius: 8,
-    borderWidth: 1,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
   },
   editButton: {
-    backgroundColor: theme.mode === 'dark' ? theme.colors.primaryLight : '#eff6ff',
-    borderColor: theme.colors.secondary,
-  },
-  editButtonText: {
-    color: theme.colors.secondary,
-    fontSize: 14,
-    fontWeight: '500',
+    backgroundColor: theme.colors.secondary,
   },
   deleteButton: {
-    backgroundColor: theme.mode === 'dark' ? theme.colors.errorLight : '#fef2f2',
-    borderColor: theme.colors.error,
-  },
-  deleteButtonText: {
-    color: theme.colors.error,
-    fontSize: 14,
-    fontWeight: '500',
+    backgroundColor: '#f44336',
   },
 
   // Modal styles with theme support
@@ -771,6 +1070,33 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   formGroup: {
     marginBottom: 16,
+  },
+  mediaTypeSelector: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  mediaTypeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+    alignItems: 'center',
+  },
+  mediaTypeButtonActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.mode === 'dark' ? theme.colors.primaryLight : theme.colors.primary + '20',
+  },
+  mediaTypeText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+  },
+  mediaTypeTextActive: {
+    color: theme.colors.primary,
   },
   label: {
     fontSize: 14,
@@ -899,6 +1225,84 @@ const createStyles = (theme: any) => StyleSheet.create({
   submitButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+
+  // Task 7 Step 5: Add filter styles
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.surface,
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 12,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  tabActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+  },
+  tabTextActive: {
+    color: '#fff',
+  },
+  filtersContainer: {
+    marginBottom: 12,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: 8,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 16,
+    color: theme.colors.text,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginRight: 8,
+    minWidth: 60,
+  },
+  filterChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surface,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  filterChipActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  filterChipText: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+  filterChipTextActive: {
+    color: '#fff',
     fontWeight: '600',
   },
 });

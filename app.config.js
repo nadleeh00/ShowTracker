@@ -4,7 +4,7 @@ export default {
   expo: {
     name: IS_DEV ? "Show-Tracker-Dev" : "Show Tracker",
     slug: IS_DEV ? "ShowTrackerDev" : "showtracker",
-    version: "2.0.0",
+    version: "3.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "showtracker",
@@ -12,7 +12,7 @@ export default {
     newArchEnabled: true,
     ios: {
       supportsTablet: true,
-      buildNumber: "2",
+      buildNumber: "3",
       bundleIdentifier: IS_DEV ? "com.anonymous.ShowTracker.dev" : "com.anonymous.ShowTracker"
     },
     android: {
@@ -21,8 +21,8 @@ export default {
         backgroundColor: "#ffffff"
       },
       edgeToEdgeEnabled: true,
-    //   package: IS_DEV ? "com.anonymous.ShowTracker.dev" : "com.anonymous.ShowTracker",
-    //   versionCode: 2
+      package: IS_DEV ? "com.anonymous.ShowTracker.dev" : "com.anonymous.ShowTracker",
+      versionCode: 3
     },
     web: {
       bundler: "metro",
@@ -47,7 +47,7 @@ export default {
     extra: {
       router: {},
       eas: {
-        projectId: IS_DEV ? "def3891f-ba7f-492e-bdb9-194a1ddfcfb8" :"bcbc2397-ad20-4e3e-9f3f-9bb52b02e15e" 
+        projectId: "bcbc2397-ad20-4e3e-9f3f-9bb52b02e15e"
       }
     }
   }
